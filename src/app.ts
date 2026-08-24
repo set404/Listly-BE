@@ -13,7 +13,8 @@ export function createApp() {
 
   if (env.TRUST_PROXY) app.set("trust proxy", 1);
 
-  app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+  const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
+  app.use(cors({ origin: allowedOrigins, credentials: true }));
   app.use(express.json());
 
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
