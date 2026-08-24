@@ -1,0 +1,126 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserKind {
+  REGISTERED
+  GUEST
+}
+
+enum AvatarColor {
+  indigo
+  rose
+  amber
+  emerald
+  sky
+  orange
+  pink
+  violet
+}
+
+enum GroupRole {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id           String      @id @default(cuid())
+  kind         UserKind
+  email        String?     @unique
+  passwordHash String?
+  name         String
+  avatarColor  AvatarColor @default(indigo)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  guestRecovery GuestRecovery?
+  memberships   GroupMember[]
+  refreshTokens RefreshToken[]
+  createdItems  ListItem[]
+
+  @@index([kind])
+}
+
+model GuestRecovery {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fingerprintHash String
+  lastIp          String
+  lastSeenAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@index([fingerprintHash, lastIp])
+  @@index([lastSeenAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Group {
+  id         String   @id @default(cuid())
+  name       String
+  emoji      String   @default("📋")
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  members GroupMember[]
+  lists   List[]
+}
+
+model GroupMember {
+  id       String    @id @default(cuid())
+  groupId  String
+  userId   String
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+model List {
+  id        String   @id @default(cuid())
+  groupId   String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  items ListItem[]
+
+  @@index([groupId])
+}
+
+model ListItem {
+  id          String    @id @default(cuid())
+  listId      String
+  text        String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  createdById String?
+
+  list      List  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([listId])
+}
