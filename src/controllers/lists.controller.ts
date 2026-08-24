@@ -7,9 +7,14 @@ const addItemSchema = z.object({
   text: z.string().trim().min(1).max(280),
 });
 
-const toggleItemSchema = z.object({
-  completed: z.boolean(),
-});
+const updateItemSchema = z
+  .object({
+    completed: z.boolean().optional(),
+    text: z.string().trim().min(1).max(280).optional(),
+  })
+  .refine((data) => data.completed !== undefined || data.text !== undefined, {
+    message: "At least one of completed or text must be provided",
+  });
 
 function uid(req: Request): string {
   if (!req.auth) throw new UnauthorizedError();
@@ -21,7 +26,7 @@ export async function addItemHandler(req: Request, res: Response) {
   res.status(201).json(await listService.addItem(uid(req), req.params.listId, text));
 }
 
-export async function toggleItemHandler(req: Request, res: Response) {
-  const { completed } = toggleItemSchema.parse(req.body);
-  res.json(await listService.toggleItem(uid(req), req.params.listId, req.params.itemId, completed));
+export async function updateItemHandler(req: Request, res: Response) {
+  const { completed, text } = updateItemSchema.parse(req.body);
+  res.json(await listService.updateItem(uid(req), req.params.listId, req.params.itemId, { completed, text }));
 }

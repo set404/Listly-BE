@@ -22,7 +22,12 @@ export async function addItem(userId: string, listId: string, text: string) {
   });
 }
 
-export async function toggleItem(userId: string, listId: string, itemId: string, completed: boolean) {
+export async function updateItem(
+  userId: string,
+  listId: string,
+  itemId: string,
+  changes: { completed?: boolean; text?: string },
+) {
   const list = await getListOrThrow(listId);
   await assertMembership(list.groupId, userId);
   const item = await prisma.listItem.findFirst({ where: { id: itemId, listId } });
@@ -30,6 +35,12 @@ export async function toggleItem(userId: string, listId: string, itemId: string,
 
   return prisma.listItem.update({
     where: { id: itemId },
-    data: { completed, completedAt: completed ? new Date() : null },
+    data: {
+      ...(changes.completed !== undefined && {
+        completed: changes.completed,
+        completedAt: changes.completed ? new Date() : null,
+      }),
+      ...(changes.text !== undefined && { text: changes.text }),
+    },
   });
 }
