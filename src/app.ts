@@ -7,6 +7,7 @@ import { usersRouter } from "./routes/users.routes";
 import { groupsRouter } from "./routes/groups.routes";
 import { listsRouter } from "./routes/lists.routes";
 import { errorHandler } from "./middleware/errorHandler";
+import { pushConfigStatus } from "./lib/push";
 
 export function createApp() {
   const app = express();
@@ -20,6 +21,9 @@ export function createApp() {
   app.use(express.json({ limit: "4mb" }));
 
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
+  // Read-only, no secrets — just enough to remotely confirm the Firebase
+  // env vars on Render were actually picked up and accepted.
+  app.get("/api/health/push", (_req, res) => res.json(pushConfigStatus()));
 
   app.use("/api/auth", authRouter);
   app.use("/api/guest", guestRouter);

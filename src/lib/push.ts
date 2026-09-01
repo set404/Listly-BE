@@ -6,24 +6,40 @@ import { prisma } from "../db";
 // Optional — no-ops until FIREBASE_* env vars are set (a Firebase project
 // has to exist first; see android/README or the setup notes in the repo).
 let app: App | null = null;
+let initError: string | null = null;
 
 function getFirebaseApp(): App | null {
   if (app) return app;
+  if (initError) return null; // already tried and failed this process lifetime
   if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return null;
   if (getApps().length > 0) {
     app = getApps()[0];
     return app;
   }
-  app = initializeApp({
-    credential: cert({
-      projectId: env.FIREBASE_PROJECT_ID,
-      clientEmail: env.FIREBASE_CLIENT_EMAIL,
-      // Render (and most env-var UIs) store the key with literal "\n" —
-      // turn those back into real newlines for the PEM to parse.
-      privateKey: env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    }),
-  });
-  return app;
+  try {
+    app = initializeApp({
+      credential: cert({
+        projectId: env.FIREBASE_PROJECT_ID,
+        clientEmail: env.FIREBASE_CLIENT_EMAIL,
+        // Render (and most env-var UIs) store the key with literal "\n" —
+        // turn those back into real newlines for the PEM to parse.
+        privateKey: env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      }),
+    });
+    return app;
+  } catch (err) {
+    initError = err instanceof Error ? err.message : String(err);
+    console.error("Firebase Admin init failed:", initError);
+    return null;
+  }
+}
+
+// Cheap remote diagnostic — never returns the credentials themselves, just
+// whether they're present and whether firebase-admin accepted them.
+export function pushConfigStatus(): { envVarsPresent: boolean; initialized: boolean; error: string | null } {
+  const envVarsPresent = Boolean(env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY);
+  const initialized = getFirebaseApp() !== null;
+  return { envVarsPresent, initialized, error: initError };
 }
 
 export async function sendPushToUsers(
