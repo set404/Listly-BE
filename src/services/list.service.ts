@@ -44,3 +44,20 @@ export async function updateItem(
     },
   });
 }
+
+export async function deleteItem(userId: string, listId: string, itemId: string) {
+  const list = await getListOrThrow(listId);
+  await assertMembership(list.groupId, userId);
+  const item = await prisma.listItem.findFirst({ where: { id: itemId, listId } });
+  if (!item) throw new NotFoundError("Item not found");
+  await prisma.listItem.delete({ where: { id: itemId } });
+}
+
+// Any group member may delete a list (symmetric with creating one) — its
+// items cascade-delete at the DB level (ListItem.list is onDelete: Cascade).
+export async function deleteList(userId: string, groupId: string, listId: string) {
+  await assertMembership(groupId, userId);
+  const list = await prisma.list.findFirst({ where: { id: listId, groupId } });
+  if (!list) throw new NotFoundError("List not found");
+  await prisma.list.delete({ where: { id: listId } });
+}

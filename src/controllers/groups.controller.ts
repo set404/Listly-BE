@@ -62,3 +62,8 @@ export async function createListHandler(req: Request, res: Response) {
   const { name } = createListSchema.parse(req.body);
   res.status(201).json(await listService.createList(uid(req), req.params.id, name));
 }
+
+export async function deleteListHandler(req: Request, res: Response) {
+  await listService.deleteList(uid(req), req.params.id, req.params.listId);
+  res.status(204).end();
+}

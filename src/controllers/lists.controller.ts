@@ -30,3 +30,8 @@ export async function updateItemHandler(req: Request, res: Response) {
   const { completed, text } = updateItemSchema.parse(req.body);
   res.json(await listService.updateItem(uid(req), req.params.listId, req.params.itemId, { completed, text }));
 }
+
+export async function deleteItemHandler(req: Request, res: Response) {
+  await listService.deleteItem(uid(req), req.params.listId, req.params.itemId);
+  res.status(204).end();
+}
