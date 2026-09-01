@@ -18,7 +18,8 @@ const createListSchema = z.object({
   name: z.string().trim().min(1).max(80),
 });
 
-const setBonusImageSchema = z.object({
+const addBonusCardSchema = z.object({
+  name: z.string().trim().min(1).max(60),
   imageUrl: imageUrlSchema,
 });
 
@@ -63,9 +64,14 @@ export async function regenerateInviteHandler(req: Request, res: Response) {
   res.json(await groupService.regenerateInvite(uid(req), req.params.id));
 }
 
-export async function setBonusImageHandler(req: Request, res: Response) {
-  const { imageUrl } = setBonusImageSchema.parse(req.body);
-  res.json(await groupService.setBonusImage(uid(req), req.params.id, imageUrl));
+export async function addBonusCardHandler(req: Request, res: Response) {
+  const { name, imageUrl } = addBonusCardSchema.parse(req.body);
+  res.status(201).json(await groupService.addBonusCard(uid(req), req.params.id, name, imageUrl));
+}
+
+export async function deleteBonusCardHandler(req: Request, res: Response) {
+  await groupService.deleteBonusCard(uid(req), req.params.id, req.params.cardId);
+  res.status(204).end();
 }
 
 export async function createListHandler(req: Request, res: Response) {

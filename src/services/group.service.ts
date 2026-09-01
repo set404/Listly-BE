@@ -5,8 +5,9 @@ import type { GroupMember, User } from "@prisma/client";
 
 type MemberWithUser = GroupMember & { user: User };
 
-const listsInclude = {
+const groupDetailInclude = {
   lists: { include: { items: true }, orderBy: { createdAt: "asc" as const } },
+  bonusCards: { orderBy: { createdAt: "asc" as const } },
 };
 
 function serializeMember(m: MemberWithUser) {
@@ -33,7 +34,7 @@ export async function listGroupsForUser(userId: string) {
       group: {
         include: {
           members: { include: { user: true } },
-          ...listsInclude,
+          ...groupDetailInclude,
         },
       },
     },
@@ -44,7 +45,7 @@ export async function listGroupsForUser(userId: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
-    bonusImageUrl: group.bonusImageUrl,
+    bonusCards: group.bonusCards,
     myRole: role,
     members: group.members.map(serializeMember),
     lists: group.lists,
@@ -59,7 +60,7 @@ export async function createGroup(userId: string, name: string, emoji: string) {
       inviteCode: generateInviteCode(),
       members: { create: { userId, role: "ADMIN" } },
     },
-    include: { members: { include: { user: true } }, ...listsInclude },
+    include: { members: { include: { user: true } }, ...groupDetailInclude },
   });
 
   return {
@@ -67,7 +68,7 @@ export async function createGroup(userId: string, name: string, emoji: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
-    bonusImageUrl: group.bonusImageUrl,
+    bonusCards: group.bonusCards,
     myRole: "ADMIN" as const,
     members: group.members.map(serializeMember),
     lists: group.lists,
@@ -77,7 +78,7 @@ export async function createGroup(userId: string, name: string, emoji: string) {
 export async function joinGroupByCode(userId: string, inviteCode: string) {
   const group = await prisma.group.findUnique({
     where: { inviteCode: inviteCode.trim().toUpperCase() },
-    include: { members: { include: { user: true } }, ...listsInclude },
+    include: { members: { include: { user: true } }, ...groupDetailInclude },
   });
   if (!group) throw new NotFoundError("Invalid invite code");
 
@@ -88,7 +89,7 @@ export async function joinGroupByCode(userId: string, inviteCode: string) {
 
   const refreshed = await prisma.group.findUniqueOrThrow({
     where: { id: group.id },
-    include: { members: { include: { user: true } }, ...listsInclude },
+    include: { members: { include: { user: true } }, ...groupDetailInclude },
   });
 
   return {
@@ -96,7 +97,7 @@ export async function joinGroupByCode(userId: string, inviteCode: string) {
     name: refreshed.name,
     emoji: refreshed.emoji,
     inviteCode: refreshed.inviteCode,
-    bonusImageUrl: refreshed.bonusImageUrl,
+    bonusCards: refreshed.bonusCards,
     myRole: "MEMBER" as const,
     members: refreshed.members.map(serializeMember),
     lists: refreshed.lists,
@@ -107,7 +108,7 @@ export async function getGroupDetail(userId: string, groupId: string) {
   const membership = await assertMembership(groupId, userId);
   const group = await prisma.group.findUniqueOrThrow({
     where: { id: groupId },
-    include: { members: { include: { user: true } }, ...listsInclude },
+    include: { members: { include: { user: true } }, ...groupDetailInclude },
   });
 
   return {
@@ -115,7 +116,7 @@ export async function getGroupDetail(userId: string, groupId: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
-    bonusImageUrl: group.bonusImageUrl,
+    bonusCards: group.bonusCards,
     myRole: membership.role,
     members: group.members.map(serializeMember),
     lists: group.lists,
@@ -147,13 +148,16 @@ export async function removeMember(groupId: string, requestingUserId: string, ta
   await prisma.groupMember.delete({ where: { id: target.id } });
 }
 
-export async function setBonusImage(userId: string, groupId: string, imageUrl: string) {
+export async function addBonusCard(userId: string, groupId: string, name: string, imageUrl: string) {
   await assertMembership(groupId, userId);
-  const group = await prisma.group.update({
-    where: { id: groupId },
-    data: { bonusImageUrl: imageUrl },
-  });
-  return { bonusImageUrl: group.bonusImageUrl };
+  return prisma.bonusCard.create({ data: { groupId, name, imageUrl } });
+}
+
+export async function deleteBonusCard(userId: string, groupId: string, cardId: string) {
+  await assertMembership(groupId, userId);
+  const card = await prisma.bonusCard.findFirst({ where: { id: cardId, groupId } });
+  if (!card) throw new NotFoundError("Bonus card not found");
+  await prisma.bonusCard.delete({ where: { id: cardId } });
 }
 
 export async function regenerateInvite(userId: string, groupId: string) {

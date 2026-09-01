@@ -72,16 +72,28 @@ model RefreshToken {
 }
 
 model Group {
-  id            String   @id @default(cuid())
-  name          String
-  emoji         String   @default("📋")
-  inviteCode    String   @unique
-  bonusImageUrl String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  emoji      String   @default("📋")
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  members GroupMember[]
-  lists   List[]
+  members    GroupMember[]
+  lists      List[]
+  bonusCards BonusCard[]
+}
+
+model BonusCard {
+  id        String   @id @default(cuid())
+  groupId   String
+  name      String
+  imageUrl  String
+  createdAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
 }
 
 model GroupMember {
