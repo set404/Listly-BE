@@ -34,12 +34,17 @@ function getFirebaseApp(): App | null {
   }
 }
 
-// Cheap remote diagnostic — never returns the credentials themselves, just
-// whether they're present and whether firebase-admin accepted them.
-export function pushConfigStatus(): { envVarsPresent: boolean; initialized: boolean; error: string | null } {
+// Remembers the outcome of the most recent send so /api/health/push can
+// show exactly what FCM said last time, without needing log access.
+let lastSend: { at: string; requested: number; successCount: number; failureCount: number; errorCodes: string[] } | null = null;
+
+// Cheap remote diagnostic — never returns the credentials or tokens
+// themselves, just enough to tell where in the pipeline things are stuck.
+export async function pushConfigStatus() {
   const envVarsPresent = Boolean(env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY);
   const initialized = getFirebaseApp() !== null;
-  return { envVarsPresent, initialized, error: initError };
+  const registeredTokenCount = await prisma.pushToken.count();
+  return { envVarsPresent, initialized, error: initError, registeredTokenCount, lastSend };
 }
 
 export async function sendPushToUsers(
@@ -59,6 +64,14 @@ export async function sendPushToUsers(
     notification: { title: notification.title, body: notification.body },
     data: notification.data,
   });
+
+  lastSend = {
+    at: new Date().toISOString(),
+    requested: tokens.length,
+    successCount: result.successCount,
+    failureCount: result.failureCount,
+    errorCodes: result.responses.filter((r) => !r.success).map((r) => r.error?.code ?? "unknown"),
+  };
 
   // Prune tokens the device/OS has since invalidated (uninstalled app,
   // expired registration, etc.) so future sends don't keep retrying them.

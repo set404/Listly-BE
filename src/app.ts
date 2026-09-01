@@ -23,7 +23,9 @@ export function createApp() {
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
   // Read-only, no secrets — just enough to remotely confirm the Firebase
   // env vars on Render were actually picked up and accepted.
-  app.get("/api/health/push", (_req, res) => res.json(pushConfigStatus()));
+  app.get("/api/health/push", (_req, res) => {
+    pushConfigStatus().then((status) => res.json(status));
+  });
 
   app.use("/api/auth", authRouter);
   app.use("/api/guest", guestRouter);
