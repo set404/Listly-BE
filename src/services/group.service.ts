@@ -44,6 +44,7 @@ export async function listGroupsForUser(userId: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
+    bonusImageUrl: group.bonusImageUrl,
     myRole: role,
     members: group.members.map(serializeMember),
     lists: group.lists,
@@ -66,6 +67,7 @@ export async function createGroup(userId: string, name: string, emoji: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
+    bonusImageUrl: group.bonusImageUrl,
     myRole: "ADMIN" as const,
     members: group.members.map(serializeMember),
     lists: group.lists,
@@ -94,6 +96,7 @@ export async function joinGroupByCode(userId: string, inviteCode: string) {
     name: refreshed.name,
     emoji: refreshed.emoji,
     inviteCode: refreshed.inviteCode,
+    bonusImageUrl: refreshed.bonusImageUrl,
     myRole: "MEMBER" as const,
     members: refreshed.members.map(serializeMember),
     lists: refreshed.lists,
@@ -112,6 +115,7 @@ export async function getGroupDetail(userId: string, groupId: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
+    bonusImageUrl: group.bonusImageUrl,
     myRole: membership.role,
     members: group.members.map(serializeMember),
     lists: group.lists,
@@ -141,6 +145,15 @@ export async function removeMember(groupId: string, requestingUserId: string, ta
   if (!target) throw new NotFoundError("Member not found in this group");
 
   await prisma.groupMember.delete({ where: { id: target.id } });
+}
+
+export async function setBonusImage(userId: string, groupId: string, imageUrl: string) {
+  await assertMembership(groupId, userId);
+  const group = await prisma.group.update({
+    where: { id: groupId },
+    data: { bonusImageUrl: imageUrl },
+  });
+  return { bonusImageUrl: group.bonusImageUrl };
 }
 
 export async function regenerateInvite(userId: string, groupId: string) {

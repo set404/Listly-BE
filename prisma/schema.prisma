@@ -72,12 +72,13 @@ model RefreshToken {
 }
 
 model Group {
-  id         String   @id @default(cuid())
-  name       String
-  emoji      String   @default("📋")
-  inviteCode String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  emoji         String   @default("📋")
+  inviteCode    String   @unique
+  bonusImageUrl String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   members GroupMember[]
   lists   List[]

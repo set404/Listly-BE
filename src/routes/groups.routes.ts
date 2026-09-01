@@ -13,6 +13,7 @@ import {
   regenerateInviteHandler,
   createListHandler,
   deleteListHandler,
+  setBonusImageHandler,
 } from "../controllers/groups.controller";
 
 export const groupsRouter = Router();
@@ -28,5 +29,6 @@ groupsRouter.delete("/:id/leave", asyncHandler(leaveGroupHandler));
 groupsRouter.get("/:id/members", asyncHandler(listMembersHandler));
 groupsRouter.delete("/:id/members/:userId", requireGroupAdmin, asyncHandler(removeMemberHandler));
 groupsRouter.post("/:id/invite/regenerate", asyncHandler(regenerateInviteHandler));
+groupsRouter.patch("/:id/bonus-image", asyncHandler(setBonusImageHandler));
 groupsRouter.post("/:id/lists", asyncHandler(createListHandler));
 groupsRouter.delete("/:id/lists/:listId", asyncHandler(deleteListHandler));

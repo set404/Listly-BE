@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as groupService from "../services/group.service";
 import * as listService from "../services/list.service";
 import { UnauthorizedError } from "../lib/errors";
+import { imageUrlSchema } from "../lib/validation";
 
 const createGroupSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -15,6 +16,10 @@ const joinGroupSchema = z.object({
 
 const createListSchema = z.object({
   name: z.string().trim().min(1).max(80),
+});
+
+const setBonusImageSchema = z.object({
+  imageUrl: imageUrlSchema,
 });
 
 function uid(req: Request): string {
@@ -56,6 +61,11 @@ export async function removeMemberHandler(req: Request, res: Response) {
 
 export async function regenerateInviteHandler(req: Request, res: Response) {
   res.json(await groupService.regenerateInvite(uid(req), req.params.id));
+}
+
+export async function setBonusImageHandler(req: Request, res: Response) {
+  const { imageUrl } = setBonusImageSchema.parse(req.body);
+  res.json(await groupService.setBonusImage(uid(req), req.params.id, imageUrl));
 }
 
 export async function createListHandler(req: Request, res: Response) {
