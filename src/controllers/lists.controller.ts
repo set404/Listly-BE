@@ -20,9 +20,10 @@ const updateItemSchema = z
   .object({
     completed: z.boolean().optional(),
     text: z.string().trim().min(1).max(280).optional(),
+    imageUrl: imageUrlSchema.optional(),
   })
-  .refine((data) => data.completed !== undefined || data.text !== undefined, {
-    message: "At least one of completed or text must be provided",
+  .refine((data) => data.completed !== undefined || data.text !== undefined || data.imageUrl !== undefined, {
+    message: "At least one of completed, text, or imageUrl must be provided",
   });
 
 function uid(req: Request): string {
@@ -36,8 +37,8 @@ export async function addItemHandler(req: Request, res: Response) {
 }
 
 export async function updateItemHandler(req: Request, res: Response) {
-  const { completed, text } = updateItemSchema.parse(req.body);
-  res.json(await listService.updateItem(uid(req), req.params.listId, req.params.itemId, { completed, text }));
+  const { completed, text, imageUrl } = updateItemSchema.parse(req.body);
+  res.json(await listService.updateItem(uid(req), req.params.listId, req.params.itemId, { completed, text, imageUrl }));
 }
 
 export async function deleteItemHandler(req: Request, res: Response) {

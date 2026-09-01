@@ -26,7 +26,7 @@ export async function updateItem(
   userId: string,
   listId: string,
   itemId: string,
-  changes: { completed?: boolean; text?: string },
+  changes: { completed?: boolean; text?: string; imageUrl?: string },
 ) {
   const list = await getListOrThrow(listId);
   await assertMembership(list.groupId, userId);
@@ -41,6 +41,7 @@ export async function updateItem(
         completedAt: changes.completed ? new Date() : null,
       }),
       ...(changes.text !== undefined && { text: changes.text }),
+      ...(changes.imageUrl !== undefined && { imageUrl: changes.imageUrl }),
     },
   });
 }
