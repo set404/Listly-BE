@@ -2,6 +2,7 @@ import { prisma } from "../db";
 import { NotFoundError } from "../lib/errors";
 import { assertMembership } from "./group.service";
 import { emitToGroup } from "../realtime";
+import { sendPushToUsers } from "../lib/push";
 
 async function getListOrThrow(listId: string) {
   const list = await prisma.list.findUnique({ where: { id: listId } });
@@ -14,7 +15,27 @@ export async function createList(userId: string, groupId: string, name: string) 
   const list = await prisma.list.create({ data: { groupId, name } });
   const result = { ...list, items: [] as const };
   emitToGroup(groupId, "list:created", { list: result });
+  notifyMembersOfNewList(groupId, userId, name).catch(() => {});
   return result;
+}
+
+// Best-effort — a push failure (or Firebase not being configured yet)
+// should never affect list creation itself.
+async function notifyMembersOfNewList(groupId: string, creatorId: string, listName: string) {
+  const [group, creator, otherMembers] = await Promise.all([
+    prisma.group.findUnique({ where: { id: groupId }, select: { name: true } }),
+    prisma.user.findUnique({ where: { id: creatorId }, select: { name: true } }),
+    prisma.groupMember.findMany({ where: { groupId, userId: { not: creatorId } }, select: { userId: true } }),
+  ]);
+  if (!group || !creator || otherMembers.length === 0) return;
+  await sendPushToUsers(
+    otherMembers.map((m) => m.userId),
+    {
+      title: group.name,
+      body: `${creator.name} created "${listName}"`,
+      data: { type: "list:created", groupId },
+    },
+  );
 }
 
 export async function addItem(userId: string, listId: string, text: string, imageUrl?: string) {

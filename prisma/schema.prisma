@@ -42,8 +42,21 @@ model User {
   memberships   GroupMember[]
   refreshTokens RefreshToken[]
   createdItems  ListItem[]
+  pushTokens    PushToken[]
 
   @@index([kind])
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   @default("android")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model GuestRecovery {
