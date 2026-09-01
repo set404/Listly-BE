@@ -15,7 +15,9 @@ export function createApp() {
 
   const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
   app.use(cors({ origin: allowedOrigins, credentials: true }));
-  app.use(express.json());
+  // Raised from the default 100kb to fit item photos, which travel as
+  // base64 data URLs in the JSON body (the client compresses them first).
+  app.use(express.json({ limit: "4mb" }));
 
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
 

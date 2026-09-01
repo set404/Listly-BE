@@ -114,6 +114,7 @@ model ListItem {
   id          String    @id @default(cuid())
   listId      String
   text        String
+  imageUrl    String?
   completed   Boolean   @default(false)
   completedAt DateTime?
   createdAt   DateTime  @default(now())

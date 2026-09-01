@@ -14,11 +14,11 @@ export async function createList(userId: string, groupId: string, name: string) 
   return { ...list, items: [] as const };
 }
 
-export async function addItem(userId: string, listId: string, text: string) {
+export async function addItem(userId: string, listId: string, text: string, imageUrl?: string) {
   const list = await getListOrThrow(listId);
   await assertMembership(list.groupId, userId);
   return prisma.listItem.create({
-    data: { listId, text, createdById: userId },
+    data: { listId, text, imageUrl, createdById: userId },
   });
 }
 
