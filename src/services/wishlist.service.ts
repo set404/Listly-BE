@@ -67,6 +67,31 @@ export async function getWishlistDetail(userId: string, groupId: string) {
   return serializeWishlist(group);
 }
 
+// The wishlist's name IS its list's name (there's no separate list-naming
+// step in the UI), so renaming the wishlist renames its list too.
+export async function updateWishlist(
+  userId: string,
+  groupId: string,
+  changes: { name?: string; emoji?: string },
+) {
+  await assertWishlistMembership(groupId, userId);
+  const group = await prisma.$transaction(async (tx) => {
+    const updated = await tx.group.update({
+      where: { id: groupId },
+      data: {
+        ...(changes.name !== undefined && { name: changes.name }),
+        ...(changes.emoji !== undefined && { emoji: changes.emoji }),
+      },
+    });
+    if (changes.name !== undefined) {
+      const list = await tx.list.findFirst({ where: { groupId } });
+      if (list) await tx.list.update({ where: { id: list.id }, data: { name: changes.name } });
+    }
+    return tx.group.findUniqueOrThrow({ where: { id: updated.id }, include: wishlistDetailInclude });
+  });
+  return serializeWishlist(group);
+}
+
 export async function deleteWishlist(userId: string, groupId: string) {
   await assertWishlistMembership(groupId, userId);
   await prisma.group.delete({ where: { id: groupId } });

@@ -14,6 +14,11 @@ const joinGroupSchema = z.object({
   inviteCode: z.string().trim().min(1),
 });
 
+const updateGroupSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  emoji: z.string().trim().min(1).max(8).optional(),
+});
+
 const createListSchema = z.object({
   name: z.string().trim().min(1).max(80),
 });
@@ -44,6 +49,11 @@ export async function joinGroupHandler(req: Request, res: Response) {
 
 export async function getGroupHandler(req: Request, res: Response) {
   res.json(await groupService.getGroupDetail(uid(req), req.params.id));
+}
+
+export async function updateGroupHandler(req: Request, res: Response) {
+  const changes = updateGroupSchema.parse(req.body);
+  res.json(await groupService.updateGroup(uid(req), req.params.id, changes));
 }
 
 export async function leaveGroupHandler(req: Request, res: Response) {

@@ -27,9 +27,18 @@ export async function assertMembership(groupId: string, userId: string): Promise
   return membership;
 }
 
+// Wishlists are Group rows too (type: WISHLIST) — the /groups/* endpoints
+// are for STANDARD groups only, so a wishlist can't be renamed, joined, or
+// fetched through the wrong shape and fall out of sync with its dedicated
+// /wishlists/* handling.
+async function assertStandardGroup(groupId: string) {
+  const group = await prisma.group.findUnique({ where: { id: groupId } });
+  if (!group || group.type !== "STANDARD") throw new NotFoundError("Group not found");
+}
+
 export async function listGroupsForUser(userId: string) {
   const memberships = await prisma.groupMember.findMany({
-    where: { userId },
+    where: { userId, group: { type: "STANDARD" } },
     include: {
       group: {
         include: {
@@ -75,9 +84,37 @@ export async function createGroup(userId: string, name: string, emoji: string) {
   };
 }
 
+export async function updateGroup(
+  userId: string,
+  groupId: string,
+  changes: { name?: string; emoji?: string },
+) {
+  const membership = await assertMembership(groupId, userId);
+  await assertStandardGroup(groupId);
+  const group = await prisma.group.update({
+    where: { id: groupId },
+    data: {
+      ...(changes.name !== undefined && { name: changes.name }),
+      ...(changes.emoji !== undefined && { emoji: changes.emoji }),
+    },
+    include: { members: { include: { user: true } }, ...groupDetailInclude },
+  });
+
+  return {
+    id: group.id,
+    name: group.name,
+    emoji: group.emoji,
+    inviteCode: group.inviteCode,
+    bonusCards: group.bonusCards,
+    myRole: membership.role,
+    members: group.members.map(serializeMember),
+    lists: group.lists,
+  };
+}
+
 export async function joinGroupByCode(userId: string, inviteCode: string) {
-  const group = await prisma.group.findUnique({
-    where: { inviteCode: inviteCode.trim().toUpperCase() },
+  const group = await prisma.group.findFirst({
+    where: { inviteCode: inviteCode.trim().toUpperCase(), type: "STANDARD" },
     include: { members: { include: { user: true } }, ...groupDetailInclude },
   });
   if (!group) throw new NotFoundError("Invalid invite code");
@@ -106,6 +143,7 @@ export async function joinGroupByCode(userId: string, inviteCode: string) {
 
 export async function getGroupDetail(userId: string, groupId: string) {
   const membership = await assertMembership(groupId, userId);
+  await assertStandardGroup(groupId);
   const group = await prisma.group.findUniqueOrThrow({
     where: { id: groupId },
     include: { members: { include: { user: true } }, ...groupDetailInclude },

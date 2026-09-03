@@ -8,6 +8,11 @@ const createWishlistSchema = z.object({
   emoji: z.string().trim().min(1).max(8).default("🎁"),
 });
 
+const updateWishlistSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  emoji: z.string().trim().min(1).max(8).optional(),
+});
+
 function uid(req: Request): string {
   if (!req.auth) throw new UnauthorizedError();
   return req.auth.userId;
@@ -24,6 +29,11 @@ export async function createWishlistHandler(req: Request, res: Response) {
 
 export async function getWishlistHandler(req: Request, res: Response) {
   res.json(await wishlistService.getWishlistDetail(uid(req), req.params.id));
+}
+
+export async function updateWishlistHandler(req: Request, res: Response) {
+  const changes = updateWishlistSchema.parse(req.body);
+  res.json(await wishlistService.updateWishlist(uid(req), req.params.id, changes));
 }
 
 export async function deleteWishlistHandler(req: Request, res: Response) {
