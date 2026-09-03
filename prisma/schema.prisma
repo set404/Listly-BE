@@ -28,6 +28,11 @@ enum GroupRole {
   MEMBER
 }
 
+enum GroupType {
+  STANDARD
+  WISHLIST
+}
+
 model User {
   id           String      @id @default(cuid())
   kind         UserKind
@@ -85,16 +90,20 @@ model RefreshToken {
 }
 
 model Group {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   name       String
-  emoji      String   @default("📋")
-  inviteCode String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  emoji      String    @default("📋")
+  type       GroupType @default(STANDARD)
+  inviteCode String    @unique
+  shareToken String?   @unique
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   members    GroupMember[]
   lists      List[]
   bonusCards BonusCard[]
+
+  @@index([type])
 }
 
 model BonusCard {

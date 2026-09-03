@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { NotFoundError } from "../lib/errors";
+import { ConflictError, NotFoundError } from "../lib/errors";
 import { assertMembership } from "./group.service";
 import { emitToGroup } from "../realtime";
 import { sendPushToUsers } from "../lib/push";
@@ -10,8 +10,20 @@ async function getListOrThrow(listId: string) {
   return list;
 }
 
+// Wishlist groups always have exactly one list, created alongside the
+// group itself (see wishlist.service.ts) — the frontend never exposes an
+// "add another list" action for them, but this stops it being reachable
+// via a direct API call too.
+async function assertNotWishlistListMutation(groupId: string) {
+  const group = await prisma.group.findUnique({ where: { id: groupId } });
+  if (group?.type === "WISHLIST") {
+    throw new ConflictError("A wishlist can only contain one list");
+  }
+}
+
 export async function createList(userId: string, groupId: string, name: string) {
   await assertMembership(groupId, userId);
+  await assertNotWishlistListMutation(groupId);
   const list = await prisma.list.create({ data: { groupId, name } });
   const result = { ...list, items: [] as const };
   emitToGroup(groupId, "list:created", { list: result });
@@ -87,6 +99,7 @@ export async function deleteItem(userId: string, listId: string, itemId: string)
 // items cascade-delete at the DB level (ListItem.list is onDelete: Cascade).
 export async function deleteList(userId: string, groupId: string, listId: string) {
   await assertMembership(groupId, userId);
+  await assertNotWishlistListMutation(groupId);
   const list = await prisma.list.findFirst({ where: { id: listId, groupId } });
   if (!list) throw new NotFoundError("List not found");
   await prisma.list.delete({ where: { id: listId } });

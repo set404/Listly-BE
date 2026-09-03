@@ -6,6 +6,7 @@ import { guestRouter } from "./routes/guest.routes";
 import { usersRouter } from "./routes/users.routes";
 import { groupsRouter } from "./routes/groups.routes";
 import { listsRouter } from "./routes/lists.routes";
+import { wishlistsRouter } from "./routes/wishlists.routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { pushConfigStatus } from "./lib/push";
 
@@ -32,6 +33,7 @@ export function createApp() {
   app.use("/api/users", usersRouter);
   app.use("/api/groups", groupsRouter);
   app.use("/api/lists", listsRouter);
+  app.use("/api/wishlists", wishlistsRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
   app.use(errorHandler);
