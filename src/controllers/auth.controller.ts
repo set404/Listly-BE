@@ -17,6 +17,10 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(1),
 });
 
+const googleSchema = z.object({
+  idToken: z.string().min(1),
+});
+
 export async function registerHandler(req: Request, res: Response) {
   const { email, password, name } = registerSchema.parse(req.body);
   const result = await authService.register(email, password, name);
@@ -26,6 +30,12 @@ export async function registerHandler(req: Request, res: Response) {
 export async function loginHandler(req: Request, res: Response) {
   const { email, password } = loginSchema.parse(req.body);
   const result = await authService.login(email, password);
+  res.json(result);
+}
+
+export async function googleHandler(req: Request, res: Response) {
+  const { idToken } = googleSchema.parse(req.body);
+  const result = await authService.loginWithGoogle(idToken);
   res.json(result);
 }
 

@@ -23,3 +23,5 @@ services:
         value: 7d
       - key: GUEST_RECOVERY_WINDOW_DAYS
         value: "30"
+      - key: GOOGLE_CLIENT_ID
+        sync: false

@@ -6,6 +6,7 @@ import {
   hashRefreshToken,
   refreshTokenExpiryDate,
 } from "../lib/jwt";
+import { verifyGoogleIdToken } from "../lib/googleAuth";
 import { ConflictError, UnauthorizedError } from "../lib/errors";
 import type { User } from "@prisma/client";
 
@@ -55,6 +56,26 @@ export async function login(email: string, password: string) {
 
   const ok = await comparePassword(password, user.passwordHash);
   if (!ok) throw new UnauthorizedError("Invalid email or password");
+
+  const tokens = await issueTokenPair(user.id, "REGISTERED");
+  return { user: publicUser(user), tokens };
+}
+
+export async function loginWithGoogle(idToken: string) {
+  const google = await verifyGoogleIdToken(idToken);
+
+  let user = await prisma.user.findUnique({ where: { googleId: google.googleId } });
+
+  if (!user) {
+    // An account may already exist with this email (registered via
+    // password) — link Google to it instead of creating a duplicate.
+    const existing = await prisma.user.findUnique({ where: { email: google.email } });
+    user = existing
+      ? await prisma.user.update({ where: { id: existing.id }, data: { googleId: google.googleId } })
+      : await prisma.user.create({
+          data: { kind: "REGISTERED", email: google.email, googleId: google.googleId, name: google.name },
+        });
+  }
 
   const tokens = await issueTokenPair(user.id, "REGISTERED");
   return { user: publicUser(user), tokens };

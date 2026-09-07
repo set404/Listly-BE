@@ -14,6 +14,10 @@ const schema = z.object({
   ACCESS_TOKEN_TTL: z.string().default("15m"),
   REFRESH_TOKEN_TTL: z.string().default("7d"),
   GUEST_RECOVERY_WINDOW_DAYS: z.coerce.number().default(30),
+  // "Sign in with Google" is optional until a Google Cloud OAuth client
+  // exists — this is the Web client ID, used as the audience when
+  // verifying ID tokens from every platform (iOS, Android, web).
+  GOOGLE_CLIENT_ID: z.string().optional(),
   // Push notifications are best-effort and optional: unset until a Firebase
   // project exists, at which point sendPush() below starts working with no
   // other code changes needed.

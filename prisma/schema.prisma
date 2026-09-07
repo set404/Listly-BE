@@ -38,6 +38,7 @@ model User {
   kind         UserKind
   email        String?     @unique
   passwordHash String?
+  googleId     String?     @unique
   name         String
   avatarColor  AvatarColor @default(indigo)
   createdAt    DateTime    @default(now())
