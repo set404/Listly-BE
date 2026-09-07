@@ -1,0 +1,18 @@
+name: Keep backend awake
+
+# Render's free tier spins the service down after 15 min of no HTTP traffic.
+# Ping it every ~14 min, but only during 11:00-22:00 Armenia time (UTC+4,
+# no DST) = 07:00-18:00 UTC, so it's free to sleep overnight and stay
+# within the free-tier monthly instance-hour quota.
+on:
+  schedule:
+    - cron: "*/14 7-17 * * *"
+    - cron: "0 18 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: curl -fsS --max-time 20 https://listly-be.onrender.com/api/health
