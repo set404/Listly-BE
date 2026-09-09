@@ -18,6 +18,7 @@ const registerPushTokenSchema = z.object({
 
 export async function getMeHandler(req: Request, res: Response) {
   if (!req.auth) throw new UnauthorizedError();
+  console.log(`[me] GET /api/users/me for user ${req.auth.userId} at ${new Date().toISOString()}`);
   const user = await prisma.user.findUnique({ where: { id: req.auth.userId } });
   if (!user) throw new NotFoundError("User not found");
   res.json(publicUser(user));
