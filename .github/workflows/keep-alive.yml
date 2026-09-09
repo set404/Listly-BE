@@ -1,22 +1,13 @@
 name: Keep backend awake
 
-# Render's free tier spins the service down after 15 min of no HTTP traffic.
-# Ping it every ~14 min, but only during 12:00-21:00 Armenia time (UTC+4,
-# no DST) = 08:00-17:00 UTC, so it's free to sleep overnight and stay
-# within the free-tier monthly instance-hour quota.
-#
-# Ticks land on :01/:15/:29/:43/:57 instead of :00/:14/:28/:42/:56.
-# GitHub explicitly documents that scheduled workflows queue up and get
-# delayed (or dropped under load) most often at exact round-minute marks,
-# :00 above all, and recommends offsetting the minute to avoid it. The
-# wrap-around gap between the last tick of one hour (:57) and the first
-# of the next (:01) is still only 4 min, well under Render's 15-min
-# sleep threshold. A final exact ping at 17:00 UTC covers the 21:00
-# Armenia window close.
+# GitHub Actions' `schedule` trigger is best-effort and, in practice on
+# this repo, silently dropped most 14-min ticks entirely (not delayed -
+# just never ran, no error, nothing in the run history). GitHub gives no
+# SLA for schedule triggers and drops them under load with no retry, so
+# the actual keep-alive pinging now lives on an external cron service
+# (cron-job.org) hitting /api/health directly every ~14 min, 12:00-21:00
+# Armenia time. This workflow is kept only for manual/on-demand pings.
 on:
-  schedule:
-    - cron: "1,15,29,43,57 8-16 * * *"
-    - cron: "0 17 * * *"
   workflow_dispatch: {}
 
 jobs:
