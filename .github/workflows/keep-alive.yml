@@ -22,7 +22,11 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
+      # Render free-tier cold starts can take 30-50+ s. A too-short
+      # --max-time aborts the request before the instance finishes
+      # booting, which can leave it half-woken and makes the *next*
+      # scheduled ping fail too, cascading into a run of failures.
       - name: Ping health endpoint
-        run: curl -fsS --max-time 20 https://listly-be.onrender.com/api/health
+        run: curl -fsS --max-time 100 https://listly-be.onrender.com/api/health
