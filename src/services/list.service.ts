@@ -53,8 +53,11 @@ async function notifyMembersOfNewList(groupId: string, creatorId: string, listNa
 export async function addItem(userId: string, listId: string, text: string, imageUrl?: string) {
   const list = await getListOrThrow(listId);
   await assertMembership(list.groupId, userId);
-  const item = await prisma.listItem.create({
-    data: { listId, text, imageUrl, createdById: userId },
+  const item = await prisma.$transaction(async (tx) => {
+    const { _max } = await tx.listItem.aggregate({ where: { listId }, _max: { order: true } });
+    return tx.listItem.create({
+      data: { listId, text, imageUrl, createdById: userId, order: (_max.order ?? -1) + 1 },
+    });
   });
   emitToGroup(list.groupId, "item:created", { listId, item });
   return item;
@@ -84,6 +87,27 @@ export async function updateItem(
   });
   emitToGroup(list.groupId, "item:updated", { listId, item: updated });
   return updated;
+}
+
+// itemIds may be any subset of the list's items (the client only reorders
+// the active/incomplete ones — completed items keep sorting by completedAt
+// and don't need an explicit order) — just no duplicates, and every id must
+// actually belong to this list.
+export async function reorderItems(userId: string, listId: string, itemIds: string[]) {
+  const list = await getListOrThrow(listId);
+  await assertMembership(list.groupId, userId);
+
+  const existing = await prisma.listItem.findMany({ where: { listId }, select: { id: true } });
+  const existingIds = new Set(existing.map((i) => i.id));
+  const uniqueIds = new Set(itemIds);
+  if (uniqueIds.size !== itemIds.length || itemIds.some((id) => !existingIds.has(id))) {
+    throw new ConflictError("itemIds must be items belonging to this list, with no duplicates");
+  }
+
+  await prisma.$transaction(
+    itemIds.map((id, order) => prisma.listItem.update({ where: { id }, data: { order } })),
+  );
+  emitToGroup(list.groupId, "items:reordered", { listId, itemIds });
 }
 
 export async function deleteItem(userId: string, listId: string, itemId: string) {

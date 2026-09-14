@@ -19,6 +19,10 @@ const updateItemSchema = z
     message: "At least one of completed, text, or imageUrl must be provided",
   });
 
+const reorderItemsSchema = z.object({
+  itemIds: z.array(z.string().min(1)).min(1),
+});
+
 function uid(req: Request): string {
   if (!req.auth) throw new UnauthorizedError();
   return req.auth.userId;
@@ -32,6 +36,12 @@ export async function addItemHandler(req: Request, res: Response) {
 export async function updateItemHandler(req: Request, res: Response) {
   const { completed, text, imageUrl } = updateItemSchema.parse(req.body);
   res.json(await listService.updateItem(uid(req), req.params.listId, req.params.itemId, { completed, text, imageUrl }));
+}
+
+export async function reorderItemsHandler(req: Request, res: Response) {
+  const { itemIds } = reorderItemsSchema.parse(req.body);
+  await listService.reorderItems(uid(req), req.params.listId, itemIds);
+  res.status(204).end();
 }
 
 export async function deleteItemHandler(req: Request, res: Response) {

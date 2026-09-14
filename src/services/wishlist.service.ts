@@ -5,7 +5,10 @@ import { NotFoundError } from "../lib/errors";
 import { assertMembership } from "./group.service";
 
 const wishlistDetailInclude = {
-  lists: { include: { items: true }, orderBy: { createdAt: "asc" as const } },
+  lists: {
+    include: { items: { orderBy: { order: "asc" as const } } },
+    orderBy: { createdAt: "asc" as const },
+  },
 };
 
 function serializeWishlist(group: {

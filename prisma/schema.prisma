@@ -153,6 +153,7 @@ model ListItem {
   imageUrl    String?
   completed   Boolean   @default(false)
   completedAt DateTime?
+  order       Int       @default(0)
   createdAt   DateTime  @default(now())
   createdById String?
 

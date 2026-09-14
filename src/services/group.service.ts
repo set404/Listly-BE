@@ -6,7 +6,10 @@ import type { GroupMember, User } from "@prisma/client";
 type MemberWithUser = GroupMember & { user: User };
 
 const groupDetailInclude = {
-  lists: { include: { items: true }, orderBy: { createdAt: "asc" as const } },
+  lists: {
+    include: { items: { orderBy: { order: "asc" as const } } },
+    orderBy: { createdAt: "asc" as const },
+  },
   bonusCards: { orderBy: { createdAt: "asc" as const } },
 };
 
