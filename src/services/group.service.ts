@@ -198,6 +198,13 @@ export async function deleteBonusCard(userId: string, groupId: string, cardId: s
   await prisma.bonusCard.delete({ where: { id: cardId } });
 }
 
+// Only reachable via the requireGroupAdmin middleware. Deletes the group
+// outright for every member, unlike /leave which just removes the caller.
+export async function deleteGroup(groupId: string) {
+  await assertStandardGroup(groupId);
+  await prisma.group.delete({ where: { id: groupId } });
+}
+
 export async function regenerateInvite(userId: string, groupId: string) {
   await assertMembership(groupId, userId);
   const group = await prisma.group.update({

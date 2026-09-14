@@ -61,6 +61,11 @@ export async function leaveGroupHandler(req: Request, res: Response) {
   res.status(204).end();
 }
 
+export async function deleteGroupHandler(req: Request, res: Response) {
+  await groupService.deleteGroup(req.params.id);
+  res.status(204).end();
+}
+
 export async function listMembersHandler(req: Request, res: Response) {
   res.json(await groupService.listMembers(uid(req), req.params.id));
 }

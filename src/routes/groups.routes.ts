@@ -8,6 +8,7 @@ import {
   joinGroupHandler,
   getGroupHandler,
   updateGroupHandler,
+  deleteGroupHandler,
   leaveGroupHandler,
   listMembersHandler,
   removeMemberHandler,
@@ -28,6 +29,7 @@ groupsRouter.post("/join", asyncHandler(joinGroupHandler));
 
 groupsRouter.get("/:id", asyncHandler(getGroupHandler));
 groupsRouter.patch("/:id", asyncHandler(updateGroupHandler));
+groupsRouter.delete("/:id", requireGroupAdmin, asyncHandler(deleteGroupHandler));
 groupsRouter.delete("/:id/leave", asyncHandler(leaveGroupHandler));
 groupsRouter.get("/:id/members", asyncHandler(listMembersHandler));
 groupsRouter.delete("/:id/members/:userId", requireGroupAdmin, asyncHandler(removeMemberHandler));
