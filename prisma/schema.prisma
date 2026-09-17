@@ -91,14 +91,15 @@ model RefreshToken {
 }
 
 model Group {
-  id         String    @id @default(cuid())
-  name       String
-  emoji      String    @default("📋")
-  type       GroupType @default(STANDARD)
-  inviteCode String    @unique
-  shareToken String?   @unique
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  name            String
+  emoji           String    @default("📋")
+  type            GroupType @default(STANDARD)
+  inviteCode      String    @unique
+  shareToken      String?   @unique
+  defaultCurrency String    @default("USD")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   members    GroupMember[]
   lists      List[]
@@ -151,6 +152,8 @@ model ListItem {
   listId      String
   text        String
   imageUrl    String?
+  price       Float?
+  currency    String?
   completed   Boolean   @default(false)
   completedAt DateTime?
   order       Int       @default(0)

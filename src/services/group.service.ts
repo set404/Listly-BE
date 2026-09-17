@@ -57,6 +57,7 @@ export async function listGroupsForUser(userId: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
+    defaultCurrency: group.defaultCurrency,
     bonusCards: group.bonusCards,
     myRole: role,
     members: group.members.map(serializeMember),
@@ -64,11 +65,12 @@ export async function listGroupsForUser(userId: string) {
   }));
 }
 
-export async function createGroup(userId: string, name: string, emoji: string) {
+export async function createGroup(userId: string, name: string, emoji: string, defaultCurrency: string) {
   const group = await prisma.group.create({
     data: {
       name,
       emoji,
+      defaultCurrency,
       inviteCode: generateInviteCode(),
       members: { create: { userId, role: "ADMIN" } },
     },
@@ -80,6 +82,7 @@ export async function createGroup(userId: string, name: string, emoji: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
+    defaultCurrency: group.defaultCurrency,
     bonusCards: group.bonusCards,
     myRole: "ADMIN" as const,
     members: group.members.map(serializeMember),
@@ -90,7 +93,7 @@ export async function createGroup(userId: string, name: string, emoji: string) {
 export async function updateGroup(
   userId: string,
   groupId: string,
-  changes: { name?: string; emoji?: string },
+  changes: { name?: string; emoji?: string; defaultCurrency?: string },
 ) {
   const membership = await assertMembership(groupId, userId);
   await assertStandardGroup(groupId);
@@ -99,6 +102,7 @@ export async function updateGroup(
     data: {
       ...(changes.name !== undefined && { name: changes.name }),
       ...(changes.emoji !== undefined && { emoji: changes.emoji }),
+      ...(changes.defaultCurrency !== undefined && { defaultCurrency: changes.defaultCurrency }),
     },
     include: { members: { include: { user: true } }, ...groupDetailInclude },
   });
@@ -108,6 +112,7 @@ export async function updateGroup(
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
+    defaultCurrency: group.defaultCurrency,
     bonusCards: group.bonusCards,
     myRole: membership.role,
     members: group.members.map(serializeMember),
@@ -137,6 +142,7 @@ export async function joinGroupByCode(userId: string, inviteCode: string) {
     name: refreshed.name,
     emoji: refreshed.emoji,
     inviteCode: refreshed.inviteCode,
+    defaultCurrency: refreshed.defaultCurrency,
     bonusCards: refreshed.bonusCards,
     myRole: "MEMBER" as const,
     members: refreshed.members.map(serializeMember),
@@ -157,6 +163,7 @@ export async function getGroupDetail(userId: string, groupId: string) {
     name: group.name,
     emoji: group.emoji,
     inviteCode: group.inviteCode,
+    defaultCurrency: group.defaultCurrency,
     bonusCards: group.bonusCards,
     myRole: membership.role,
     members: group.members.map(serializeMember),

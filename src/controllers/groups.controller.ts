@@ -3,11 +3,12 @@ import { z } from "zod";
 import * as groupService from "../services/group.service";
 import * as listService from "../services/list.service";
 import { UnauthorizedError } from "../lib/errors";
-import { imageUrlSchema } from "../lib/validation";
+import { imageUrlSchema, currencyCodeSchema } from "../lib/validation";
 
 const createGroupSchema = z.object({
   name: z.string().trim().min(1).max(80),
   emoji: z.string().trim().min(1).max(8).default("📋"),
+  defaultCurrency: currencyCodeSchema.default("USD"),
 });
 
 const joinGroupSchema = z.object({
@@ -17,6 +18,7 @@ const joinGroupSchema = z.object({
 const updateGroupSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   emoji: z.string().trim().min(1).max(8).optional(),
+  defaultCurrency: currencyCodeSchema.optional(),
 });
 
 const createListSchema = z.object({
@@ -38,8 +40,8 @@ export async function listGroupsHandler(req: Request, res: Response) {
 }
 
 export async function createGroupHandler(req: Request, res: Response) {
-  const { name, emoji } = createGroupSchema.parse(req.body);
-  res.status(201).json(await groupService.createGroup(uid(req), name, emoji));
+  const { name, emoji, defaultCurrency } = createGroupSchema.parse(req.body);
+  res.status(201).json(await groupService.createGroup(uid(req), name, emoji, defaultCurrency));
 }
 
 export async function joinGroupHandler(req: Request, res: Response) {

@@ -10,6 +10,14 @@ async function getListOrThrow(listId: string) {
   return list;
 }
 
+// Prices (and their currency) only make sense for a regular shopping list,
+// not a wishlist (there's no "total cost" concept for gift ideas) — so a
+// wishlist's items silently ignore any price/currency sent to them, the same
+// way createList blocks a wishlist from getting a second list.
+async function getGroupForList(groupId: string) {
+  return prisma.group.findUnique({ where: { id: groupId }, select: { type: true, defaultCurrency: true } });
+}
+
 // Wishlist groups always have exactly one list, created alongside the
 // group itself (see wishlist.service.ts) — the frontend never exposes an
 // "add another list" action for them, but this stops it being reachable
@@ -50,13 +58,32 @@ async function notifyMembersOfNewList(groupId: string, creatorId: string, listNa
   );
 }
 
-export async function addItem(userId: string, listId: string, text: string, imageUrl?: string) {
+export async function addItem(
+  userId: string,
+  listId: string,
+  text: string,
+  imageUrl?: string,
+  price?: number,
+  currency?: string,
+) {
   const list = await getListOrThrow(listId);
   await assertMembership(list.groupId, userId);
+  const group = await getGroupForList(list.groupId);
+  const isWishlist = group?.type === "WISHLIST";
   const item = await prisma.$transaction(async (tx) => {
     const { _max } = await tx.listItem.aggregate({ where: { listId }, _max: { order: true } });
     return tx.listItem.create({
-      data: { listId, text, imageUrl, createdById: userId, order: (_max.order ?? -1) + 1 },
+      data: {
+        listId,
+        text,
+        imageUrl,
+        price: isWishlist ? null : price,
+        // No currency without a price, and a price always resolves to some
+        // currency — the one the client picked, or the group's default.
+        currency: isWishlist || price === undefined ? null : (currency ?? group?.defaultCurrency ?? "USD"),
+        createdById: userId,
+        order: (_max.order ?? -1) + 1,
+      },
     });
   });
   emitToGroup(list.groupId, "item:created", { listId, item });
@@ -67,12 +94,30 @@ export async function updateItem(
   userId: string,
   listId: string,
   itemId: string,
-  changes: { completed?: boolean; text?: string; imageUrl?: string },
+  changes: { completed?: boolean; text?: string; imageUrl?: string; price?: number | null; currency?: string },
 ) {
   const list = await getListOrThrow(listId);
   await assertMembership(list.groupId, userId);
   const item = await prisma.listItem.findFirst({ where: { id: itemId, listId } });
   if (!item) throw new NotFoundError("Item not found");
+  const group = await getGroupForList(list.groupId);
+  const isWishlist = group?.type === "WISHLIST";
+
+  // Clearing the price clears its currency too; setting/changing the price
+  // resolves a currency from whatever was passed, the item's existing one,
+  // or the group's default, in that order. Changing only the currency (no
+  // price in the same call) is allowed, but only on an already-priced item.
+  let priceChange: { price?: number | null; currency?: string | null } = {};
+  if (!isWishlist) {
+    if (changes.price !== undefined) {
+      priceChange =
+        changes.price === null
+          ? { price: null, currency: null }
+          : { price: changes.price, currency: changes.currency ?? item.currency ?? group?.defaultCurrency ?? "USD" };
+    } else if (changes.currency !== undefined && item.price !== null) {
+      priceChange = { currency: changes.currency };
+    }
+  }
 
   const updated = await prisma.listItem.update({
     where: { id: itemId },
@@ -83,6 +128,7 @@ export async function updateItem(
       }),
       ...(changes.text !== undefined && { text: changes.text }),
       ...(changes.imageUrl !== undefined && { imageUrl: changes.imageUrl }),
+      ...priceChange,
     },
   });
   emitToGroup(list.groupId, "item:updated", { listId, item: updated });
