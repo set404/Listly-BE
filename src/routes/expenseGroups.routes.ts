@@ -16,6 +16,8 @@ import {
   addExpenseHandler,
   updateExpenseHandler,
   deleteExpenseHandler,
+  addSettlementHandler,
+  deleteSettlementHandler,
 } from "../controllers/expenseGroups.controller";
 
 export const expenseGroupsRouter = Router();
@@ -36,3 +38,5 @@ expenseGroupsRouter.post("/:id/invite/regenerate", asyncHandler(regenerateExpens
 expenseGroupsRouter.post("/:id/expenses", asyncHandler(addExpenseHandler));
 expenseGroupsRouter.patch("/:id/expenses/:expenseId", asyncHandler(updateExpenseHandler));
 expenseGroupsRouter.delete("/:id/expenses/:expenseId", asyncHandler(deleteExpenseHandler));
+expenseGroupsRouter.post("/:id/settlements", asyncHandler(addSettlementHandler));
+expenseGroupsRouter.delete("/:id/settlements/:settlementId", asyncHandler(deleteSettlementHandler));

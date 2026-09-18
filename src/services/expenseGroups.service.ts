@@ -4,12 +4,15 @@ import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { assertMembership, serializeMember, type MemberWithUser } from "./group.service";
 import { emitToGroup } from "../realtime";
 import { sendPushToUsers } from "../lib/push";
-import type { Expense, ExpenseSplit } from "@prisma/client";
+import type { Expense, ExpenseSplit, Settlement } from "@prisma/client";
 
 const expenseGroupDetailInclude = {
   members: { include: { user: true } },
   expenses: {
     include: { splits: true },
+    orderBy: { createdAt: "desc" as const },
+  },
+  settlements: {
     orderBy: { createdAt: "desc" as const },
   },
 };
@@ -23,6 +26,7 @@ type ExpenseGroupRow = {
   defaultCurrency: string;
   members: MemberWithUser[];
   expenses: ExpenseWithSplits[];
+  settlements: Settlement[];
 };
 
 function serializeExpense(e: ExpenseWithSplits) {
@@ -38,6 +42,18 @@ function serializeExpense(e: ExpenseWithSplits) {
   };
 }
 
+function serializeSettlement(s: Settlement) {
+  return {
+    id: s.id,
+    fromUserId: s.fromUserId,
+    toUserId: s.toUserId,
+    amount: s.amount,
+    currency: s.currency,
+    createdAt: s.createdAt,
+    createdById: s.createdById,
+  };
+}
+
 function serializeExpenseGroup(group: ExpenseGroupRow, myRole: "ADMIN" | "MEMBER") {
   return {
     id: group.id,
@@ -48,6 +64,7 @@ function serializeExpenseGroup(group: ExpenseGroupRow, myRole: "ADMIN" | "MEMBER
     myRole,
     members: group.members.map(serializeMember),
     expenses: group.expenses.map(serializeExpense),
+    settlements: group.settlements.map(serializeSettlement),
   };
 }
 
@@ -294,4 +311,79 @@ export async function deleteExpense(userId: string, groupId: string, expenseId: 
   if (!expense) throw new NotFoundError("Expense not found");
   await prisma.expense.delete({ where: { id: expenseId } });
   emitToGroup(groupId, "expense:deleted", { groupId, expenseId, deletedById: userId });
+}
+
+// Records a real-world payment (cash, bank transfer, etc.) from one member to
+// another — not tied to a specific expense, just a standalone credit that
+// shifts both members' overall balance, the same way sendings a bill payment
+// would. Both members just need to belong to the group; the recorder doesn't
+// have to be either of them (mirrors addExpense letting paidById be anyone).
+export async function addSettlement(
+  userId: string,
+  groupId: string,
+  input: { fromUserId: string; toUserId: string; amount: number; currency?: string },
+) {
+  await assertMembership(groupId, userId);
+  const group = await prisma.group.findUniqueOrThrow({ where: { id: groupId } });
+  if (group.type !== "EXPENSE") throw new NotFoundError("Expense group not found");
+
+  if (input.fromUserId === input.toUserId) {
+    throw new ValidationError("A settlement must be between two different members");
+  }
+  const members = await prisma.groupMember.findMany({ where: { groupId } });
+  const memberIds = new Set(members.map((m) => m.userId));
+  if (!memberIds.has(input.fromUserId) || !memberIds.has(input.toUserId)) {
+    throw new ValidationError("fromUserId and toUserId must both be members of this group");
+  }
+
+  const settlement = await prisma.settlement.create({
+    data: {
+      groupId,
+      fromUserId: input.fromUserId,
+      toUserId: input.toUserId,
+      amount: input.amount,
+      currency: input.currency ?? group.defaultCurrency,
+      createdById: userId,
+    },
+  });
+  const result = serializeSettlement(settlement);
+  emitToGroup(groupId, "settlement:created", { groupId, settlement: result });
+  notifyOfSettlement(groupId, userId, input.fromUserId, input.toUserId, result.amount, result.currency).catch(() => {});
+  return result;
+}
+
+// Best-effort — mirrors notifySharersOfNewExpense. Notifies whichever side
+// of the settlement isn't the person recording it, since that's the one who
+// wouldn't otherwise know a payment was logged on their behalf.
+async function notifyOfSettlement(
+  groupId: string,
+  recorderId: string,
+  fromUserId: string,
+  toUserId: string,
+  amount: number,
+  currency: string,
+) {
+  const notifyUserId = recorderId === fromUserId ? toUserId : recorderId === toUserId ? fromUserId : null;
+  if (!notifyUserId) return;
+  const [group, fromUser, toUser] = await Promise.all([
+    prisma.group.findUnique({ where: { id: groupId }, select: { name: true } }),
+    prisma.user.findUnique({ where: { id: fromUserId }, select: { name: true } }),
+    prisma.user.findUnique({ where: { id: toUserId }, select: { name: true } }),
+  ]);
+  if (!group || !fromUser || !toUser) return;
+  await sendPushToUsers([notifyUserId], {
+    title: group.name,
+    body: `${fromUser.name} paid ${toUser.name} ${amount} ${currency}`,
+    data: { type: "settlement:created", groupId },
+  });
+}
+
+// Any group member may delete a settlement (matches the trust model already
+// used for expenses).
+export async function deleteSettlement(userId: string, groupId: string, settlementId: string) {
+  await assertMembership(groupId, userId);
+  const settlement = await prisma.settlement.findFirst({ where: { id: settlementId, groupId } });
+  if (!settlement) throw new NotFoundError("Settlement not found");
+  await prisma.settlement.delete({ where: { id: settlementId } });
+  emitToGroup(groupId, "settlement:deleted", { groupId, settlementId, deletedById: userId });
 }

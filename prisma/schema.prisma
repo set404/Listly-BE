@@ -45,14 +45,17 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  guestRecovery   GuestRecovery?
-  memberships     GroupMember[]
-  refreshTokens   RefreshToken[]
-  createdItems    ListItem[]
-  pushTokens      PushToken[]
-  paidExpenses    Expense[]      @relation("ExpensePaidBy")
-  createdExpenses Expense[]      @relation("ExpenseCreatedBy")
-  expenseSplits   ExpenseSplit[]
+  guestRecovery       GuestRecovery?
+  memberships         GroupMember[]
+  refreshTokens       RefreshToken[]
+  createdItems        ListItem[]
+  pushTokens          PushToken[]
+  paidExpenses        Expense[]      @relation("ExpensePaidBy")
+  createdExpenses     Expense[]      @relation("ExpenseCreatedBy")
+  expenseSplits       ExpenseSplit[]
+  settlementsSent     Settlement[]   @relation("SettlementFrom")
+  settlementsReceived Settlement[]   @relation("SettlementTo")
+  createdSettlements  Settlement[]   @relation("SettlementCreatedBy")
 
   @@index([kind])
 }
@@ -105,10 +108,11 @@ model Group {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  members    GroupMember[]
-  lists      List[]
-  bonusCards BonusCard[]
-  expenses   Expense[]
+  members     GroupMember[]
+  lists       List[]
+  bonusCards  BonusCard[]
+  expenses    Expense[]
+  settlements Settlement[]
 
   @@index([type])
 }
@@ -191,7 +195,7 @@ model Expense {
 
 // One row per person the expense is split between — amount is that
 // person's equal share (shares sum exactly to Expense.amount, with any
-// rounding remainder absorbed into the last share).
+// rounding remainder absorbed into the payer's own share).
 model ExpenseSplit {
   id        String @id @default(cuid())
   expenseId String
@@ -203,4 +207,25 @@ model ExpenseSplit {
 
   @@unique([expenseId, userId])
   @@index([userId])
+}
+
+// A recorded real-world payment between two members (e.g. cash or a bank
+// transfer outside the app) that settles part of their balance — not tied to
+// any specific Expense, just a standalone credit from fromUser to toUser.
+model Settlement {
+  id          String   @id @default(cuid())
+  groupId     String
+  fromUserId  String
+  toUserId    String
+  amount      Float
+  currency    String
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromUser  User  @relation("SettlementFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser    User  @relation("SettlementTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("SettlementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
 }

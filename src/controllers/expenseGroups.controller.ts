@@ -42,6 +42,13 @@ const updateExpenseSchema = z
     { message: "At least one field must be provided" },
   );
 
+const addSettlementSchema = z.object({
+  fromUserId: z.string().min(1),
+  toUserId: z.string().min(1),
+  amount: z.number().positive().finite().max(999999999),
+  currency: currencyCodeSchema.optional(),
+});
+
 function uid(req: Request): string {
   if (!req.auth) throw new UnauthorizedError();
   return req.auth.userId;
@@ -109,5 +116,15 @@ export async function updateExpenseHandler(req: Request, res: Response) {
 
 export async function deleteExpenseHandler(req: Request, res: Response) {
   await expenseGroupService.deleteExpense(uid(req), req.params.id, req.params.expenseId);
+  res.status(204).end();
+}
+
+export async function addSettlementHandler(req: Request, res: Response) {
+  const input = addSettlementSchema.parse(req.body);
+  res.status(201).json(await expenseGroupService.addSettlement(uid(req), req.params.id, input));
+}
+
+export async function deleteSettlementHandler(req: Request, res: Response) {
+  await expenseGroupService.deleteSettlement(uid(req), req.params.id, req.params.settlementId);
   res.status(204).end();
 }
