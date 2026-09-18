@@ -144,13 +144,19 @@ export async function deleteExpenseGroup(groupId: string) {
 }
 
 // Divides `amount` evenly across `participantIds`, in cents, with any
-// leftover cent from the division absorbed into the last share — so shares
-// always sum exactly back to `amount` regardless of rounding.
-function splitEvenly(amount: number, participantIds: string[]): number[] {
+// leftover cent from the division absorbed into the payer's own share (or
+// the last participant if the payer isn't one of them) — so shares always
+// sum exactly back to `amount` regardless of rounding, and a group that
+// rotates who pays for identical recurring expenses still nets to zero
+// instead of one fixed participant quietly absorbing every odd cent.
+function splitEvenly(amount: number, participantIds: string[], paidById: string): number[] {
   const totalCents = Math.round(amount * 100);
   const baseShare = Math.floor(totalCents / participantIds.length);
   const remainder = totalCents - baseShare * participantIds.length;
-  return participantIds.map((_, i) => (i < participantIds.length - 1 ? baseShare : baseShare + remainder) / 100);
+  const remainderIndex = participantIds.includes(paidById)
+    ? participantIds.indexOf(paidById)
+    : participantIds.length - 1;
+  return participantIds.map((_, i) => (i === remainderIndex ? baseShare + remainder : baseShare) / 100);
 }
 
 export async function addExpense(
@@ -172,7 +178,7 @@ export async function addExpense(
     throw new ValidationError("paidById and participantIds must all be members of this group");
   }
 
-  const shares = splitEvenly(input.amount, uniqueParticipantIds);
+  const shares = splitEvenly(input.amount, uniqueParticipantIds, input.paidById);
   const currency = input.currency ?? group.defaultCurrency;
 
   const expense = await prisma.expense.create({
@@ -258,7 +264,7 @@ export async function updateExpense(
     throw new ValidationError("paidById and participantIds must all be members of this group");
   }
 
-  const shares = splitEvenly(amount, uniqueParticipantIds);
+  const shares = splitEvenly(amount, uniqueParticipantIds, paidById);
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.expenseSplit.deleteMany({ where: { expenseId } });
