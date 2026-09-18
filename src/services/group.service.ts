@@ -39,6 +39,11 @@ async function assertStandardGroup(groupId: string) {
   if (!group || group.type !== "STANDARD") throw new NotFoundError("Group not found");
 }
 
+// Card-level summary for the groups tab — deliberately excludes list items
+// (which can carry large base64 image data URLs, see ListItem.imageUrl) and
+// bonus cards, so opening the tab doesn't pull down every photo in every
+// list of every group. getGroupDetail below is the full-fidelity fetch,
+// used only once a specific group is actually opened.
 export async function listGroupsForUser(userId: string) {
   const memberships = await prisma.groupMember.findMany({
     where: { userId, group: { type: "STANDARD" } },
@@ -46,22 +51,38 @@ export async function listGroupsForUser(userId: string) {
       group: {
         include: {
           members: { include: { user: true } },
-          ...groupDetailInclude,
+          lists: {
+            orderBy: { createdAt: "desc" as const },
+            take: 1,
+            select: { id: true, name: true, _count: { select: { items: true } } },
+          },
+          _count: { select: { lists: true } },
         },
       },
     },
   });
 
-  return memberships.map(({ group, role }) => ({
-    id: group.id,
-    name: group.name,
-    emoji: group.emoji,
-    inviteCode: group.inviteCode,
-    defaultCurrency: group.defaultCurrency,
-    bonusCards: group.bonusCards,
-    myRole: role,
-    members: group.members.map(serializeMember),
-    lists: group.lists,
+  return Promise.all(memberships.map(async ({ group, role }) => {
+    const activeListRow = group.lists[0] ?? null;
+    const [activeListDone, totalItems, doneItems] = await Promise.all([
+      activeListRow ? prisma.listItem.count({ where: { listId: activeListRow.id, completed: true } }) : Promise.resolve(0),
+      prisma.listItem.count({ where: { list: { groupId: group.id } } }),
+      prisma.listItem.count({ where: { list: { groupId: group.id }, completed: true } }),
+    ]);
+    return {
+      id: group.id,
+      name: group.name,
+      emoji: group.emoji,
+      inviteCode: group.inviteCode,
+      defaultCurrency: group.defaultCurrency,
+      myRole: role,
+      members: group.members.map(serializeMember),
+      listCount: group._count.lists,
+      activeList: activeListRow
+        ? { id: activeListRow.id, name: activeListRow.name, itemCount: activeListRow._count.items, doneCount: activeListDone }
+        : null,
+      itemCounts: { total: totalItems, done: doneItems },
+    };
   }));
 }
 

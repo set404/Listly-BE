@@ -46,12 +46,29 @@ export async function createWishlist(userId: string, name: string, emoji: string
   return serializeWishlist(group);
 }
 
+// Card-level summary for the wishlists tab — item counts only, not every
+// item's full row (which can carry a large base64 image data URL). See
+// getWishlistDetail below for the full-fidelity fetch of a single wishlist.
 export async function listWishlistsForUser(userId: string) {
   const memberships = await prisma.groupMember.findMany({
     where: { userId, group: { type: "WISHLIST" } },
-    include: { group: { include: wishlistDetailInclude } },
+    include: {
+      group: {
+        include: { lists: { take: 1, select: { id: true, _count: { select: { items: true } } } } },
+      },
+    },
   });
-  return memberships.map(({ group }) => serializeWishlist(group));
+  return Promise.all(memberships.map(async ({ group }) => {
+    const list = group.lists[0] ?? null;
+    const doneCount = list ? await prisma.listItem.count({ where: { listId: list.id, completed: true } }) : 0;
+    return {
+      id: group.id,
+      name: group.name,
+      emoji: group.emoji,
+      itemCount: list?._count.items ?? 0,
+      doneCount,
+    };
+  }));
 }
 
 async function assertWishlistMembership(groupId: string, userId: string) {

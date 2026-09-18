@@ -77,12 +77,60 @@ async function assertExpenseGroup(groupId: string) {
   if (!group || group.type !== "EXPENSE") throw new NotFoundError("Expense group not found");
 }
 
+type BalanceSummary =
+  | { kind: "owed"; amount: number; currency: string }
+  | { kind: "owes"; amount: number; currency: string }
+  | { kind: "settled" }
+  | null;
+
+// Mirrors computeExpenseBalances' per-currency net (paid + settlements sent,
+// minus split shares + settlements received), but only for one member and
+// without loading every other member's rows — the list endpoint only needs
+// "am I owed, do I owe, or am I settled", not the full ledger.
+async function computeMyBalanceSummary(groupId: string, userId: string): Promise<BalanceSummary> {
+  const [paidExpenses, mySplits, sent, received] = await Promise.all([
+    prisma.expense.findMany({ where: { groupId, paidById: userId }, select: { amount: true, currency: true } }),
+    prisma.expenseSplit.findMany({
+      where: { userId, expense: { groupId } },
+      select: { amount: true, expense: { select: { currency: true } } },
+    }),
+    prisma.settlement.findMany({ where: { groupId, fromUserId: userId }, select: { amount: true, currency: true } }),
+    prisma.settlement.findMany({ where: { groupId, toUserId: userId }, select: { amount: true, currency: true } }),
+  ]);
+
+  const balance: Record<string, number> = {};
+  for (const e of paidExpenses) balance[e.currency] = (balance[e.currency] ?? 0) + e.amount;
+  for (const s of mySplits) balance[s.expense.currency] = (balance[s.expense.currency] ?? 0) - s.amount;
+  for (const s of sent) balance[s.currency] = (balance[s.currency] ?? 0) + s.amount;
+  for (const s of received) balance[s.currency] = (balance[s.currency] ?? 0) - s.amount;
+
+  const entry = Object.entries(balance).find(([, amt]) => Math.abs(amt) > 0.005);
+  if (entry) {
+    const [currency, amt] = entry;
+    return amt > 0 ? { kind: "owed", amount: amt, currency } : { kind: "owes", amount: -amt, currency };
+  }
+  return paidExpenses.length > 0 || mySplits.length > 0 ? { kind: "settled" } : null;
+}
+
+// Card-level summary for the expense groups tab — the viewer's own net
+// balance only, not every expense/split/settlement for every member (see
+// getExpenseGroupDetail below for the full ledger, fetched once a specific
+// group is actually opened).
 export async function listExpenseGroupsForUser(userId: string) {
   const memberships = await prisma.groupMember.findMany({
     where: { userId, group: { type: "EXPENSE" } },
-    include: { group: { include: expenseGroupDetailInclude } },
+    include: { group: { include: { members: { include: { user: true } } } } },
   });
-  return memberships.map(({ group, role }) => serializeExpenseGroup(group, role));
+  return Promise.all(memberships.map(async ({ group, role }) => ({
+    id: group.id,
+    name: group.name,
+    emoji: group.emoji,
+    inviteCode: group.inviteCode,
+    defaultCurrency: group.defaultCurrency,
+    myRole: role,
+    members: group.members.map(serializeMember),
+    balanceSummary: await computeMyBalanceSummary(group.id, userId),
+  })));
 }
 
 export async function createExpenseGroup(
