@@ -3,7 +3,7 @@ import { generateInviteCode } from "../lib/inviteCode";
 import { ConflictError, ForbiddenError, NotFoundError } from "../lib/errors";
 import type { GroupMember, User } from "@prisma/client";
 
-type MemberWithUser = GroupMember & { user: User };
+export type MemberWithUser = GroupMember & { user: User };
 
 const groupDetailInclude = {
   lists: {
@@ -13,7 +13,7 @@ const groupDetailInclude = {
   bonusCards: { orderBy: { createdAt: "asc" as const } },
 };
 
-function serializeMember(m: MemberWithUser) {
+export function serializeMember(m: MemberWithUser) {
   return {
     id: m.user.id,
     name: m.user.name,

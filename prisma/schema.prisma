@@ -31,6 +31,7 @@ enum GroupRole {
 enum GroupType {
   STANDARD
   WISHLIST
+  EXPENSE
 }
 
 model User {
@@ -44,11 +45,14 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  guestRecovery GuestRecovery?
-  memberships   GroupMember[]
-  refreshTokens RefreshToken[]
-  createdItems  ListItem[]
-  pushTokens    PushToken[]
+  guestRecovery   GuestRecovery?
+  memberships     GroupMember[]
+  refreshTokens   RefreshToken[]
+  createdItems    ListItem[]
+  pushTokens      PushToken[]
+  paidExpenses    Expense[]      @relation("ExpensePaidBy")
+  createdExpenses Expense[]      @relation("ExpenseCreatedBy")
+  expenseSplits   ExpenseSplit[]
 
   @@index([kind])
 }
@@ -104,6 +108,7 @@ model Group {
   members    GroupMember[]
   lists      List[]
   bonusCards BonusCard[]
+  expenses   Expense[]
 
   @@index([type])
 }
@@ -164,4 +169,38 @@ model ListItem {
   createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([listId])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  groupId     String
+  description String
+  amount      Float
+  currency    String
+  paidById    String
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  paidBy    User           @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: Cascade)
+  createdBy User?          @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  splits    ExpenseSplit[]
+
+  @@index([groupId])
+}
+
+// One row per person the expense is split between — amount is that
+// person's equal share (shares sum exactly to Expense.amount, with any
+// rounding remainder absorbed into the last share).
+model ExpenseSplit {
+  id        String @id @default(cuid())
+  expenseId String
+  userId    String
+  amount    Float
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, userId])
+  @@index([userId])
 }

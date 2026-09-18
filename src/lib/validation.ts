@@ -10,9 +10,6 @@ export const imageUrlSchema = z
 
 // Keep in sync with Listly-FE's src/app/lib/currencies.ts — there's no
 // shared package between the two apps, so this list is duplicated.
-export const CURRENCY_CODES = [
-  "USD", "EUR", "GBP", "AMD", "RUB", "GEL", "TRY", "UAH",
-  "CNY", "JPY", "CAD", "AUD", "CHF", "INR", "AED",
-] as const;
+export const CURRENCY_CODES = ["USD", "EUR", "AMD"] as const;
 export type CurrencyCode = (typeof CURRENCY_CODES)[number];
 export const currencyCodeSchema = z.enum(CURRENCY_CODES);
